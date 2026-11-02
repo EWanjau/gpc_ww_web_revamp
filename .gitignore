@@ -1,23 +1,7 @@
-# Local credentials and environment files
+node_modules/
+dist/
+playwright-report/
+test-results/
 .env
 .env.*
 !.env.example
-.aws/
-.codex/
-.claude/
-*.pem
-*.key
-*.p12
-*.pfx
-credentials
-credentials.*
-
-# Dependencies and generated output
-node_modules/
-vendor/
-.next/
-dist/
-build/
-coverage/
-*.log
-.DS_Store
