@@ -9,6 +9,11 @@ test('visitor can find Plan a visit from homepage and shared navigation', async 
 });
 
 test('visitor can find a Missional Community through shared navigation', async ({ page }) => {
+  await page.route('**/wp-json/wp/v2/missional-community?**', async (route) => {
+    await route.fulfill({ json: [
+      ...['Limuru', 'Online', 'Ginduri', 'Kinoo Makutano', 'Wambaa', 'Swahili', 'Sunday', '87 Junction', 'Muhuri Road', 'Kinoo', 'Muthiga', 'Kihumo', 'Regen'].map((name) => ({ title: { rendered: `${name} MC` } })),
+    ] });
+  });
   await page.goto('/');
   await page.getByRole('link', { name: /find your community/i }).click();
   await expect(page).toHaveURL(/#missional-communities$/);
@@ -17,6 +22,7 @@ test('visitor can find a Missional Community through shared navigation', async (
   await expect(page).toHaveURL(/#community-list$/);
   const communities = page.locator('#community-list');
   await expect(communities.getByRole('heading', { name: 'Choose a place to connect.' })).toBeVisible();
+  await expect(communities.getByRole('heading', { name: '87 Junction' })).toBeVisible();
   for (const name of ['Limuru', 'Online', 'Ginduri', 'Kinoo Makutano', 'Wambaa', 'Swahili', 'Sunday', '87 Junction', 'Muhuri Road', 'Kinoo', 'Muthiga', 'Kihumo', 'Regen']) {
     await expect(communities.getByRole('heading', { name: new RegExp(`^${name}$`, 'i') })).toBeVisible();
   }
