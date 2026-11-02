@@ -128,3 +128,30 @@ test('visitor can browse WordPress newsletters and read and download an availabl
   await expect(page.getByTitle('March Newsletter PDF')).toHaveCount(0);
   await expect(page.getByRole('link', { name: /open or download the newsletter pdf/i })).toHaveCount(0);
 });
+
+test('visitor can browse cached sermon thumbnails and open the video on YouTube', async ({ page }) => {
+  await page.route('**/wp-json/wp/v2/pages?slug=sermons&_fields=content', async (route) => {
+    await route.fulfill({ json: [{ content: { rendered: `
+      <div class="video-card" data-video-title="Sunday: Hope in Christ">
+        <a href="https://www.youtube.com/watch?v=abc123XYZ00"><img src="https://i.ytimg.com/vi/abc123XYZ00/hqdefault.jpg" alt="" onerror="window.compromised=true"></a>
+      </div>
+      <div data-video-title="A second message"><a href="https://www.youtube.com/watch?v=Zyx987Qwe65"><img src="https://i1.ytimg.com/vi/Zyx987Qwe65/mqdefault.jpg"></a></div>
+      <div data-video-title="Ignore other destinations"><a href="https://example.com/watch?v=bad"><img src="https://example.com/image.jpg"></a></div>
+      <script>window.compromised = true</script>
+    ` } }] });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /toggle navigation/i }).click();
+  await page.getByRole('link', { name: /^sermons$/i }).click();
+  await expect(page).toHaveURL(/#sermons$/);
+  await expect(page.getByRole('heading', { name: 'Sermons' })).toBeVisible();
+  const card = page.getByRole('article').filter({ hasText: 'Sunday: Hope in Christ' });
+  await expect(card.getByRole('img', { name: 'Sunday: Hope in Christ' })).toHaveAttribute('src', 'https://i.ytimg.com/vi/abc123XYZ00/hqdefault.jpg');
+  const outbound = card.getByRole('link', { name: 'Sunday: Hope in Christ' });
+  await expect(outbound).toHaveAttribute('href', 'https://www.youtube.com/watch?v=abc123XYZ00');
+  await expect(outbound).toHaveAttribute('target', '_blank');
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await expect(page.locator('iframe')).toHaveCount(0);
+  await expect(page.locator('script:not([type="module"])')).toHaveCount(0);
+  await expect(page.locator('img[onerror]')).toHaveCount(0);
+});
