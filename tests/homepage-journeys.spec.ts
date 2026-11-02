@@ -9,6 +9,11 @@ test('visitor can find Plan a visit from homepage and shared navigation', async 
 });
 
 test('visitor can find a Missional Community through shared navigation', async ({ page }) => {
+  await page.route('**/wp-json/wp/v2/missional-community?**', async (route) => {
+    await route.fulfill({ json: [
+      ...['Limuru', 'Online', 'Ginduri', 'Kinoo Makutano', 'Wambaa', 'Swahili', 'Sunday', '87 Junction', 'Muhuri Road', 'Kinoo', 'Muthiga', 'Kihumo', 'Regen'].map((name) => ({ title: { rendered: `${name} MC` } })),
+    ] });
+  });
   await page.goto('/');
   await page.getByRole('link', { name: /find your community/i }).click();
   await expect(page).toHaveURL(/#missional-communities$/);
@@ -17,6 +22,7 @@ test('visitor can find a Missional Community through shared navigation', async (
   await expect(page).toHaveURL(/#community-list$/);
   const communities = page.locator('#community-list');
   await expect(communities.getByRole('heading', { name: 'Choose a place to connect.' })).toBeVisible();
+  await expect(communities.getByRole('heading', { name: '87 Junction' })).toBeVisible();
   for (const name of ['Limuru', 'Online', 'Ginduri', 'Kinoo Makutano', 'Wambaa', 'Swahili', 'Sunday', '87 Junction', 'Muhuri Road', 'Kinoo', 'Muthiga', 'Kihumo', 'Regen']) {
     await expect(communities.getByRole('heading', { name: new RegExp(`^${name}$`, 'i') })).toBeVisible();
   }
@@ -91,4 +97,34 @@ test('visitor can browse WordPress articles and read an article with its date an
   await expect(page.locator('.article-body img[onerror]')).toHaveCount(0);
   await page.getByRole('link', { name: /back to articles/i }).click();
   await expect(page).toHaveURL(/#articles$/);
+});
+
+test('visitor can browse WordPress newsletters and read and download an available PDF', async ({ page }) => {
+  await page.route('**/wp-json/wp/v2/newsletter?**', async (route) => {
+    await route.fulfill({ json: [{
+      id: 61, date: '2025-04-06T10:00:00', slug: 'april-news', title: { rendered: 'April Newsletter' },
+      content: { rendered: '<p>Church family news for April.</p><p><a href="https://gpcwaiyakiway.org/wp-content/uploads/2025/04/april.pdf">Read the April PDF</a></p>' },
+    }, {
+      id: 62, date: '2025-03-01T10:00:00', slug: 'march-news', title: { rendered: 'March Newsletter' },
+      content: { rendered: '<p>Church family news for March.</p>' },
+    }] });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /toggle navigation/i }).click();
+  await page.getByRole('navigation', { name: /main navigation/i }).getByRole('link', { name: /^newsletters$/i }).click();
+  await expect(page).toHaveURL(/#newsletters$/);
+  await expect(page.getByRole('heading', { name: 'Newsletters' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'April Newsletter' })).toBeVisible();
+  await expect(page.getByText('April 6, 2025')).toBeVisible();
+  await page.getByRole('link', { name: /read newsletter: april newsletter/i }).click();
+  await expect(page).toHaveURL(/#newsletter\/april-news$/);
+  await expect(page.getByRole('heading', { name: 'April Newsletter' })).toBeVisible();
+  const pdf = page.getByTitle('April Newsletter PDF');
+  await expect(pdf).toHaveAttribute('src', 'https://gpcwaiyakiway.org/wp-content/uploads/2025/04/april.pdf');
+  await expect(page.getByRole('link', { name: /open or download the newsletter pdf/i })).toHaveAttribute('href', 'https://gpcwaiyakiway.org/wp-content/uploads/2025/04/april.pdf');
+  await page.getByRole('link', { name: /back to newsletters/i }).click();
+  await page.getByRole('link', { name: /read newsletter: march newsletter/i }).click();
+  await expect(page.getByText(/no pdf file is available for this newsletter/i)).toBeVisible();
+  await expect(page.getByTitle('March Newsletter PDF')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /open or download the newsletter pdf/i })).toHaveCount(0);
 });
