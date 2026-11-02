@@ -61,3 +61,34 @@ test('mobile visitor can open shared navigation and reach contact', async ({ pag
   await expect(page).toHaveURL(/#contact$/);
   await expect(page.locator('#contact')).toBeVisible();
 });
+
+test('visitor can browse WordPress articles and read an article with its date and author', async ({ page }) => {
+  await page.route('**/wp-json/wp/v2/posts?**', async (route) => {
+    await route.fulfill({ json: [
+      {
+        id: 41, date: '2025-03-08T09:30:00', slug: 'hope-in-the-waiting',
+        title: { rendered: 'Hope in the Waiting' },
+        excerpt: { rendered: '<p>A reflection on <em>patient hope</em>.</p>' },
+        content: { rendered: '<p>When life is uncertain, <strong>Jesus remains faithful.</strong></p><p>We can encourage one another.</p><p>&lt;img src=x onerror=&quot;window.compromised = true&quot;&gt;</p><script>window.compromised = true</script><img src=x onerror="window.compromised = true">' },
+        author: 7, _embedded: { author: [{ name: 'editor' }] },
+      },
+    ] });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /toggle navigation/i }).click();
+  await page.getByRole('navigation', { name: /main navigation/i }).getByRole('link', { name: /^articles$/i }).click();
+  await expect(page).toHaveURL(/#articles$/);
+  await expect(page.getByRole('heading', { name: 'Articles' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Hope in the Waiting' })).toBeVisible();
+  await expect(page.getByText('March 8, 2025')).toBeVisible();
+  await page.getByRole('link', { name: /read article: hope in the waiting/i }).click();
+  await expect(page).toHaveURL(/#article\/hope-in-the-waiting$/);
+  await expect(page.getByRole('heading', { name: 'Hope in the Waiting' })).toBeVisible();
+  await expect(page.locator('main')).toContainText('Jesus remains faithful.');
+  await expect(page.locator('main')).toContainText('By editor');
+  await expect(page.locator('.article-body')).toContainText('<img src=x onerror="window.compromised = true">');
+  await expect(page.locator('.article-body script')).toHaveCount(0);
+  await expect(page.locator('.article-body img[onerror]')).toHaveCount(0);
+  await page.getByRole('link', { name: /back to articles/i }).click();
+  await expect(page).toHaveURL(/#articles$/);
+});
