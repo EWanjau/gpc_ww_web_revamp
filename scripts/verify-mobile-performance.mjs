@@ -1,4 +1,6 @@
 import { spawn, execFileSync } from 'node:child_process';
+import { once } from 'node:events';
+import { resolve } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 
 const port = Number(process.env.PREVIEW_PORT || 4174);
@@ -8,7 +10,7 @@ process.env.CHROME_PATH = chromePath;
 
 execFileSync('npm', ['run', 'build'], { stdio: 'inherit' });
 
-const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
+const preview = spawn(process.execPath, [resolve('node_modules/vite/bin/vite.js'), 'preview', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
   stdio: 'inherit',
   env: process.env,
 });
@@ -46,5 +48,12 @@ try {
   }
   if (score <= 88) throw new Error(`Mobile performance score must be above 88; received ${score}.`);
 } finally {
-  preview.kill('SIGTERM');
+  if (preview.exitCode === null && preview.signalCode === null) {
+    preview.kill('SIGTERM');
+    await Promise.race([once(preview, 'exit'), new Promise((resolve) => setTimeout(resolve, 5000))]);
+    if (preview.exitCode === null && preview.signalCode === null) {
+      preview.kill('SIGKILL');
+      await once(preview, 'exit');
+    }
+  }
 }

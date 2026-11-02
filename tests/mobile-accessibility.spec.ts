@@ -20,8 +20,14 @@ test.beforeEach(async ({ page }) => {
       }] });
     } else if (url.pathname.endsWith('/pages') && url.searchParams.get('slug') === 'sermons') {
       await route.fulfill({ json: [{ content: { rendered: '<div data-video-title="Hope in Christ"><a href="https://www.youtube.com/watch?v=abc123XYZ00"><img src="https://i.ytimg.com/vi/abc123XYZ00/hqdefault.jpg"></a></div>' } }] });
+    } else if (url.pathname.endsWith('/pages') && url.searchParams.get('slug') === 'home') {
+      await route.fulfill({ json: [{ title: { rendered: 'Home' }, excerpt: { rendered: 'A church family.' }, content: { rendered: '<h3>Our Services</h3><p>We meet every Sunday: 10:30 am - 12:30 pm</p><h3>Visit Us</h3><p>We are located at Muthiga, off Waiyaki Way.</p><h3>Join Us In Ministry</h3><p>We serve one another.</p><h3>Call Us</h3><p>+254 741 254528 info@gpcwaiyakiway.org P.O. Box 1913, Kikuyu, Kenya 10200</p>' } }] });
+    } else if (url.pathname.endsWith('/pages') && url.searchParams.get('slug') === 'contact-us') {
+      await route.fulfill({ json: [{ content: { rendered: '<h2>Locate Us</h2><p>At Muthiga, off Waiyaki Way</p><p>+254 741 254528</p><p>info@gpcwaiyakiway.org</p>' } }] });
+    } else if (url.pathname.endsWith('/pages') && url.searchParams.get('slug') === 'missional-communities') {
+      await route.fulfill({ json: [{ content: { rendered: '<h2>Missional Communities</h2><p>A family of believers following Christ together.</p>' } }] });
     } else {
-      await route.fulfill({ json: [{ title: { rendered: 'A place to belong, grow and serve' }, excerpt: { rendered: 'A church family.' } }] });
+      await route.fulfill({ json: [] });
     }
   });
 });

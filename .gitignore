@@ -1,7 +1,24 @@
 node_modules/
+vendor/
+.next/
 dist/
+build/
+coverage/
+*.log
+.DS_Store
 playwright-report/
 test-results/
 .env
 .env.*
 !.env.example
+
+# Local credentials and environment files
+.aws/
+.codex/
+.claude/
+*.pem
+*.key
+*.p12
+*.pfx
+credentials
+credentials.*

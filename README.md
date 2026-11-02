@@ -15,14 +15,27 @@ Build the static deployable site with `npm run build`; serve `dist/` from any st
 
 This starter uses **React + TypeScript + Vite**. Vite emits static HTML, CSS and JavaScript that can be deployed to a static host or served behind WordPress. This keeps page delivery lightweight and makes content connections explicit.
 
-Homepage content is read from WordPress's public REST API, `GET {VITE_WORDPRESS_API_URL}/pages?slug=home&_fields=title,content,excerpt,acf`. By default `VITE_WORDPRESS_API_URL` is `https://gpcwaiyakiway.org/wp-json/wp/v2`; set that environment variable for another WordPress install. The `home` page's title and excerpt/content feed the hero. Staff and volunteers can update these through the regular WordPress editor without code changes. The app falls back to a generic welcome message if the public request is unavailable or content is empty. No authenticated writes or credentials are needed in the browser.
+Homepage visitor content is read from WordPress's public REST API. By default `VITE_WORDPRESS_API_URL` is `https://gpcwaiyakiway.org/wp-json/wp/v2`; set that environment variable for another WordPress install. The app requests the public `home`, `contact-us`, and `missional-communities` pages with their published content, plus the `missional-community` custom post type. No authenticated writes or credentials are needed in the browser.
 
-The visitor information currently reflects details published on the official GracePoint Church Waiyaki Way site at `https://gpcwaiyakiway.org/` (Sunday 10:30 am–12:30 pm; Muthiga along Wambaa–Wamakima Road; public email `info@gpcwaiyakiway.org`). Review these details in WordPress before deployment if they change. Missional Community and serving links open pre-addressed email drafts; replace with managed WordPress destinations when those pages are available.
+## WordPress content sources
+
+Staff can update these details in the regular WordPress editor. The page parser uses headings and their following paragraph blocks, so keep the headings with their copy when changing the layout:
+
+| Visitor content | WordPress source | Published structure used |
+| --- | --- | --- |
+| Service hours | **Pages → Home** | Paragraph after the `Our Services` heading, containing a weekday and time range |
+| Visit location and directions | **Pages → Contact Us**, then **Home** as fallback | Location text beginning with “At …” or “We are located …”; Home may use the `Visit Us` heading |
+| Phone, email, postal address | **Pages → Home** and **Contact Us** | `tel:` and `mailto:` links are preferred; visible phone/email text is also read. Postal address is read from Home text beginning `P.O. Box` |
+| About heading, hero introduction, and About copy | **Pages → Home** | `About Us` heading followed by paragraph blocks. The first paragraph also supplies the hero introduction when no excerpt is published |
+| Serving description | **Pages → Home** | Paragraphs after `How to Plug in` or `Join Us In Ministry` |
+| Missional Community introduction | **Pages → Missional Communities** | First paragraph after the `Missional Communities` heading |
+| Community names | **Missional Community** custom post type | Published post titles; the `MC` suffix is omitted in display |
+| Community schedules and leaders | **Pages → Missional Communities** | Elementor loop-item cards: the card heading supplies its name; ACF widgets with `data-settings.acf_field_list` of `meeting_day` and `leader` supply the corresponding visible values. Direct CPT ACF values are used where supplied and take precedence when non-empty. |
+
+If a page request fails or the relevant content is unavailable, the app uses the last verified GracePoint visitor details for service time, location, phone, and email. Community meeting and leader details are shown only when WordPress publishes them. If an optional field is absent, its label is omitted. Changes to WordPress content appear on the next page load.
 
 ## Content updates
 
-1. Sign into WordPress and open **Pages → Home**.
-2. Update the title and excerpt (or body content) and publish.
-3. Reload the homepage to see the latest published content.
-
-The current design provides starter layout and copy for other homepage sections; those sections can be moved into editable fields/blocks as the page's WordPress content model is finalized.
+1. Sign into WordPress and open the source page or custom post type shown in the table above.
+2. Update the published heading, paragraph, link, or community field and publish.
+3. Reload the homepage to see the latest visitor content.
