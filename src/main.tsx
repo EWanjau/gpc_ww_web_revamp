@@ -134,7 +134,7 @@ function App() {
   const intro = fieldText(content.excerpt?.rendered || content.content?.rendered) || clean(fallback.excerpt?.rendered);
   return <>
     <header className="site-header">
-      <a className="brand" href="#home" aria-label="GracePoint Church Waiyaki Way home"><span className="brand-mark">G<span>•</span></span><span>GracePoint Church<small>Waiyaki Way</small></span></a>
+      <a className="brand" href="#home"><span className="brand-mark" aria-hidden="true">G<span>•</span></span><span>GracePoint Church<small>Waiyaki Way</small></span></a>
       <button className="menu-toggle" aria-label="Toggle navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><span></span><span></span></button>
       <nav className={menuOpen ? 'navigation open' : 'navigation'} aria-label="Main navigation">
         <a onClick={() => setMenuOpen(false)} href="#plan-a-visit">Plan a visit</a>

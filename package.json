@@ -7,16 +7,19 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test:journeys": "playwright test"
+    "test:journeys": "playwright test",
+    "verify:mobile-performance": "node scripts/verify-mobile-performance.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "vite": "latest"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "latest",
+    "lighthouse": "^13.6.0",
     "typescript": "latest"
   }
 }
