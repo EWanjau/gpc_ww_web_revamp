@@ -19,6 +19,7 @@ const communities = [
 ];
 type CommunityRecord = { title?: { rendered?: string } };
 type Article = { id: number; date?: string; slug: string; title?: { rendered?: string }; excerpt?: { rendered?: string }; content?: { rendered?: string }; author?: number; _embedded?: { author?: Array<{ name?: string }> } };
+type Newsletter = { id: number; date?: string; slug: string; title?: { rendered?: string }; content?: { rendered?: string }; author?: number; _embedded?: { author?: Array<{ name?: string }> } };
 
 type PageContent = { title?: string; content?: { rendered?: string }; excerpt?: { rendered?: string }; acf?: Record<string, unknown> };
 const apiBase = (import.meta.env.VITE_WORDPRESS_API_URL || 'https://gpcwaiyakiway.org/wp-json/wp/v2').replace(/\/$/, '');
@@ -48,6 +49,14 @@ function safeArticleHtml(html = '') {
 }
 function articleTitle(article: Article) { return clean(article.title?.rendered || 'Untitled article'); }
 function articleDate(article: Article) { if (!article.date) return ''; const date = new Date(article.date); return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('en', { year: 'numeric', month: 'long', day: 'numeric' }).format(date); }
+function sourcePdf(newsletter: Newsletter) {
+  const parsed = new DOMParser().parseFromString(newsletter.content?.rendered || '', 'text/html');
+  for (const anchor of Array.from(parsed.querySelectorAll('a[href]'))) {
+    const href = anchor.getAttribute('href') || '';
+    try { const url = new URL(href, 'https://gpcwaiyakiway.org'); if (/\.pdf$/i.test(url.pathname) && /^https?:$/.test(url.protocol)) return url.href; } catch { /* Ignore malformed published links. */ }
+  }
+  return '';
+}
 function App() {
   const [content, setContent] = useState<PageContent>(fallback);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -55,7 +64,18 @@ function App() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [articleHash, setArticleHash] = useState(() => window.location.hash);
-  useEffect(() => { const updateHash = () => setArticleHash(window.location.hash); window.addEventListener('hashchange', updateHash); return () => window.removeEventListener('hashchange', updateHash); }, []);
+  const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
+  const [newslettersLoading, setNewslettersLoading] = useState(false);
+  const [newsletterHash, setNewsletterHash] = useState(() => window.location.hash);
+  useEffect(() => { const updateHash = () => { setArticleHash(window.location.hash); setNewsletterHash(window.location.hash); }; window.addEventListener('hashchange', updateHash); return () => window.removeEventListener('hashchange', updateHash); }, []);
+  useEffect(() => {
+    setNewslettersLoading(true);
+    fetch(`${apiBase}/newsletter?per_page=50&_embed=1`)
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((records: Newsletter[]) => setNewsletters(records))
+      .catch(() => setNewsletters([]))
+      .finally(() => setNewslettersLoading(false));
+  }, []);
   useEffect(() => {
     setArticlesLoading(true);
     fetch(`${apiBase}/posts?per_page=50&_embed=1`)
@@ -90,13 +110,21 @@ function App() {
         <a onClick={() => setMenuOpen(false)} href="#missional-communities">Missional Communities</a>
         <a onClick={() => setMenuOpen(false)} href="#about">About</a>
         <a onClick={() => setMenuOpen(false)} href="#articles">Articles</a>
+        <a onClick={() => setMenuOpen(false)} href="#newsletters">Newsletters</a>
         <a onClick={() => setMenuOpen(false)} href="#serving">Serving</a>
         <a onClick={() => setMenuOpen(false)} href="#contact">Contact</a>
         <a className="nav-cta" onClick={() => setMenuOpen(false)} href="#plan-a-visit">Join us Sunday <span aria-hidden="true">↗</span></a>
       </nav>
     </header>
     <main id="home">
-      {articleHash === '#articles' || articleHash.startsWith('#article/') ? <section className="articles-page section" aria-label="Articles">
+      {newsletterHash === '#newsletters' || newsletterHash.startsWith('#newsletter/') ? <section className="articles-page section" aria-label="Newsletters">
+        {newsletterHash.startsWith('#newsletter/') ? (() => {
+          const slug = decodeURIComponent(newsletterHash.slice('#newsletter/'.length));
+          const newsletter = newsletters.find((item) => item.slug === slug);
+          const pdf = newsletter && sourcePdf(newsletter);
+          return <div className="article-detail"><a className="text-link" href="#newsletters">← Back to newsletters</a>{newsletter ? <><p className="eyebrow">GracePoint Church · Newsletter</p><h1>{clean(newsletter.title?.rendered || 'Untitled newsletter')}</h1><ArticleMeta article={newsletter} />{pdf ? <div className="newsletter-reader"><iframe title={`${clean(newsletter.title?.rendered || 'Newsletter')} PDF`} src={pdf} loading="lazy" /><a className="button button-dark" href={pdf} target="_blank" rel="noopener noreferrer" aria-label="Open or download the newsletter PDF">Open or download the PDF <span>↗</span></a></div> : <p className="newsletter-unavailable">No PDF file is available for this newsletter.</p>}<div className="article-body" dangerouslySetInnerHTML={{ __html: safeArticleHtml(newsletter.content?.rendered || '') }} /></> : <p>{newslettersLoading ? 'Loading newsletter…' : 'This newsletter could not be found.'}</p>}</div>;
+        })() : <><p className="eyebrow">News and updates from our church family</p><h1>Newsletters</h1><p className="articles-intro">Read updates from GracePoint Church Waiyaki Way, with PDF editions available where published.</p>{newslettersLoading ? <p>Loading newsletters…</p> : newsletters.length ? <div className="article-grid">{newsletters.map((newsletter) => <article className="article-card" key={newsletter.id}><p className="article-date">{articleDate(newsletter)}</p><h2>{clean(newsletter.title?.rendered || 'Untitled newsletter')}</h2><div className="article-excerpt" dangerouslySetInnerHTML={{ __html: safeArticleHtml(newsletter.content?.rendered || '') }} /><a className="text-link" aria-label={`Read newsletter: ${clean(newsletter.title?.rendered || 'Untitled newsletter')}`} href={`#newsletter/${encodeURIComponent(newsletter.slug)}`}>Read newsletter <span>↗</span></a></article>)}</div> : <p>There are no newsletters to show right now.</p>}</>}
+      </section> : articleHash === '#articles' || articleHash.startsWith('#article/') ? <section className="articles-page section" aria-label="Articles">
         {articleHash.startsWith('#article/') ? (() => {
           const slug = decodeURIComponent(articleHash.slice('#article/'.length));
           const article = articles.find((item) => item.slug === slug);
@@ -107,7 +135,7 @@ function App() {
         <div className="hero-copy"><p className="eyebrow"><span></span> GracePoint Church · Waiyaki Way</p><h1>{title}</h1><p className="hero-intro">{intro}</p><div className="hero-actions"><a className="button button-dark" href="#plan-a-visit">Plan a visit <span>↗</span></a><a className="text-link" href="#missional-communities">Find your community <span>↗</span></a></div><div className="hero-note"><div className="avatar-stack" aria-hidden="true"><i>G</i><i>P</i><i>W</i></div><span>A church family, learning to follow Jesus together.</span></div></div>
         <div className="hero-art" aria-label="Warm, welcoming gathering illustration" role="img"><div className="sun"></div><div className="arch arch-back"></div><div className="arch arch-front"><div className="window"><span></span><span></span><span></span><span></span></div></div><div className="plant plant-left">✳</div><div className="plant plant-right">✳</div><div className="caption">A seat at the table<br/><small>There’s room for you.</small></div></div>
       </section>
-      <section className="quick-links" aria-label="Explore GracePoint"><a href="#plan-a-visit"><span className="quick-number">01</span><span><strong>Plan your visit</strong><small>What to expect when you join us</small></span><b aria-hidden="true">↗</b></a><a href="#missional-communities"><span className="quick-number">02</span><span><strong>Find a community</strong><small>Grow in faith, life and friendship</small></span><b aria-hidden="true">↗</b></a><a href="#about"><span className="quick-number">03</span><span><strong>Get to know us</strong><small>Our heart and what we believe</small></span><b aria-hidden="true">↗</b></a><a href="#articles"><span className="quick-number">04</span><span><strong>Read articles</strong><small>Reflections and updates</small></span><b aria-hidden="true">↗</b></a></section>
+      <section className="quick-links" aria-label="Explore GracePoint"><a href="#plan-a-visit"><span className="quick-number">01</span><span><strong>Plan your visit</strong><small>What to expect when you join us</small></span><b aria-hidden="true">↗</b></a><a href="#missional-communities"><span className="quick-number">02</span><span><strong>Find a community</strong><small>Grow in faith, life and friendship</small></span><b aria-hidden="true">↗</b></a><a href="#about"><span className="quick-number">03</span><span><strong>Get to know us</strong><small>Our heart and what we believe</small></span><b aria-hidden="true">↗</b></a><a href="#articles"><span className="quick-number">04</span><span><strong>Read articles</strong><small>Reflections and updates</small></span><b aria-hidden="true">↗</b></a><a href="#newsletters"><span className="quick-number">05</span><span><strong>Read newsletters</strong><small>Church news and updates</small></span><b aria-hidden="true">↗</b></a></section>
       <section className="welcome section" id="about"><p className="eyebrow">Rooted in the Gospel</p><h2>Created for good works.</h2><p>We believe the good news of Jesus changes how we live, love our neighbours and serve our community. Wherever you are on your journey, you are welcome here.</p><a className="text-link" href="#serving">Discover our story <span>↗</span></a></section>
       <section className="visit section" id="plan-a-visit"><div className="visit-copy"><p className="eyebrow">Your first Sunday</p><h2>We’d love to meet you.</h2><p>GracePoint Church Waiyaki Way is a gathering of confessing Christians. Join us for our Sunday service; visitors are welcome.</p><div className="visit-details"><div><span className="detail-icon">◷</span><span><strong>Sunday service</strong><small>10:30 am – 12:30 pm</small></span></div><div><span className="detail-icon">⌖</span><span><strong>Find us</strong><small>Muthiga, off Waiyaki Way along Wambaa–Wamakima Road, between Zawadi School and Lofty Creek Christian School</small></span></div></div><a className="button button-dark" href="https://www.google.com/maps/search/?api=1&query=GracePoint+Church+Waiyaki+Way+Muthiga" target="_blank" rel="noreferrer">Get directions <span>↗</span></a></div><div className="visit-card"><div className="card-sun"></div><div className="card-lines"></div><div className="card-label">SUNDAYS TOGETHER</div><div className="card-time">10:30<span>am</span></div><div className="card-bottom">Sunday service <span>✳</span></div></div></section>
       <section className="community section" id="missional-communities"><div className="community-art"><span className="community-flower">✳</span><span className="community-word">together</span><span className="community-caption">Faith grows in community.</span></div><div className="community-copy"><p className="eyebrow">Life beyond Sunday</p><h2>Faith is better<br/>together.</h2><p>A Missional Community is a family of believers at GracePoint Waiyaki Way, intentionally following Christ and making followers of Christ in everyday life. These communities meet weekly, are centred on the Gospel, and encourage discipleship, evangelism, encouragement and prayer.</p><a className="button button-light" href="#community-list">Find a Missional Community <span>↓</span></a></div></section>
