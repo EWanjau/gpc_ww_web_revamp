@@ -13,6 +13,16 @@ test('visitor can find a Missional Community through shared navigation', async (
   await page.getByRole('link', { name: /find your community/i }).click();
   await expect(page).toHaveURL(/#missional-communities$/);
   await expect(page.getByRole('heading', { name: /faith is better together/i })).toBeVisible();
+  await page.getByRole('link', { name: /find a missional community/i }).click();
+  await expect(page).toHaveURL(/#community-list$/);
+  const communities = page.locator('#community-list');
+  await expect(communities.getByRole('heading', { name: 'Choose a place to connect.' })).toBeVisible();
+  for (const name of ['Limuru', 'Online', 'Ginduri', 'Kinoo Makutano', 'Wambaa', 'Swahili', 'Sunday', '87 Junction', 'Muhuri Road', 'Kinoo', 'Muthiga', 'Kihumo', 'Regen']) {
+    await expect(communities.getByRole('heading', { name: new RegExp(`^${name}$`, 'i') })).toBeVisible();
+  }
+  await expect(communities).toContainText('Wednesday, 7:15–8:15 pm');
+  await expect(communities).toContainText('Anthony Kamau');
+  await expect(communities.getByRole('link', { name: /ask about connecting/i })).toHaveAttribute('href', /mailto:info@gpcwaiyakiway\.org\?subject=Help%20me%20find%20a%20Missional%20Community/);
 });
 
 test('visitor can plan a Sunday visit with verified details and working actions', async ({ page }) => {
