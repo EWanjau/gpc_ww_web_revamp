@@ -22,6 +22,7 @@ type Article = { id: number; date?: string; slug: string; title?: { rendered?: s
 type Newsletter = { id: number; date?: string; slug: string; title?: { rendered?: string }; content?: { rendered?: string }; author?: number; _embedded?: { author?: Array<{ name?: string }> } };
 
 type PageContent = { title?: string; content?: { rendered?: string }; excerpt?: { rendered?: string }; acf?: Record<string, unknown> };
+type Sermon = { title: string; href: string; thumbnail: string };
 const apiBase = (import.meta.env.VITE_WORDPRESS_API_URL || 'https://gpcwaiyakiway.org/wp-json/wp/v2').replace(/\/$/, '');
 const fallback: PageContent = {
   title: 'A place to belong, grow and serve',
@@ -57,6 +58,25 @@ function sourcePdf(newsletter: Newsletter) {
   }
   return '';
 }
+function parseSermons(html = ''): Sermon[] {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const sermons: Sermon[] = [];
+  for (const item of Array.from(parsed.querySelectorAll<HTMLElement>('[data-video-title]'))) {
+    const title = (item.getAttribute('data-video-title') || '').trim();
+    const anchor = item.querySelector<HTMLAnchorElement>('a[href]');
+    const image = anchor?.querySelector<HTMLImageElement>('img[src]');
+    if (!title || !anchor || !image) continue;
+    try {
+      const video = new URL(anchor.getAttribute('href') || '');
+      const id = video.searchParams.get('v') || '';
+      const thumbnail = new URL(image.getAttribute('src') || '');
+      if (video.protocol !== 'https:' || video.hostname !== 'www.youtube.com' || video.pathname !== '/watch' || !/^[\w-]{11}$/.test(id)) continue;
+      if (thumbnail.protocol !== 'https:' || !/^i\d*\.ytimg\.com$/.test(thumbnail.hostname) || !thumbnail.pathname.startsWith(`/vi/${id}/`)) continue;
+      sermons.push({ title, href: `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`, thumbnail: thumbnail.href });
+    } catch { /* Ignore malformed cached gallery entries. */ }
+  }
+  return sermons;
+}
 function App() {
   const [content, setContent] = useState<PageContent>(fallback);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -67,7 +87,18 @@ function App() {
   const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
   const [newslettersLoading, setNewslettersLoading] = useState(false);
   const [newsletterHash, setNewsletterHash] = useState(() => window.location.hash);
-  useEffect(() => { const updateHash = () => { setArticleHash(window.location.hash); setNewsletterHash(window.location.hash); }; window.addEventListener('hashchange', updateHash); return () => window.removeEventListener('hashchange', updateHash); }, []);
+  const [sermons, setSermons] = useState<Sermon[]>([]);
+  const [sermonsLoading, setSermonsLoading] = useState(false);
+  const [sermonHash, setSermonHash] = useState(() => window.location.hash);
+  useEffect(() => { const updateHash = () => { setArticleHash(window.location.hash); setNewsletterHash(window.location.hash); setSermonHash(window.location.hash); }; window.addEventListener('hashchange', updateHash); return () => window.removeEventListener('hashchange', updateHash); }, []);
+  useEffect(() => {
+    setSermonsLoading(true);
+    fetch(`${apiBase}/pages?slug=sermons&_fields=content`)
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((pages: PageContent[]) => setSermons(parseSermons(pages[0]?.content?.rendered || '')))
+      .catch(() => setSermons([]))
+      .finally(() => setSermonsLoading(false));
+  }, []);
   useEffect(() => {
     setNewslettersLoading(true);
     fetch(`${apiBase}/newsletter?per_page=50&_embed=1`)
@@ -111,13 +142,17 @@ function App() {
         <a onClick={() => setMenuOpen(false)} href="#about">About</a>
         <a onClick={() => setMenuOpen(false)} href="#articles">Articles</a>
         <a onClick={() => setMenuOpen(false)} href="#newsletters">Newsletters</a>
+        <a onClick={() => setMenuOpen(false)} href="#sermons">Sermons</a>
         <a onClick={() => setMenuOpen(false)} href="#serving">Serving</a>
         <a onClick={() => setMenuOpen(false)} href="#contact">Contact</a>
         <a className="nav-cta" onClick={() => setMenuOpen(false)} href="#plan-a-visit">Join us Sunday <span aria-hidden="true">↗</span></a>
       </nav>
     </header>
     <main id="home">
-      {newsletterHash === '#newsletters' || newsletterHash.startsWith('#newsletter/') ? <section className="articles-page section" aria-label="Newsletters">
+      {sermonHash === '#sermons' ? <section className="articles-page section" aria-label="Sermons">
+        <p className="eyebrow">Messages from GracePoint Church</p><h1>Sermons</h1><p className="articles-intro">Browse recent messages. Each thumbnail opens its video on YouTube.</p>
+        {sermonsLoading ? <p>Loading sermons…</p> : sermons.length ? <div className="sermon-grid">{sermons.map((sermon) => <article className="sermon-card" key={sermon.href}><a href={sermon.href} target="_blank" rel="noopener noreferrer" aria-label={sermon.title}><img src={sermon.thumbnail} alt={sermon.title} loading="lazy" /><span className="sermon-play" aria-hidden="true">▶</span></a><h2>{sermon.title}</h2></article>)}</div> : <p>There are no sermons to show right now.</p>}
+      </section> : newsletterHash === '#newsletters' || newsletterHash.startsWith('#newsletter/') ? <section className="articles-page section" aria-label="Newsletters">
         {newsletterHash.startsWith('#newsletter/') ? (() => {
           const slug = decodeURIComponent(newsletterHash.slice('#newsletter/'.length));
           const newsletter = newsletters.find((item) => item.slug === slug);
@@ -135,7 +170,7 @@ function App() {
         <div className="hero-copy"><p className="eyebrow"><span></span> GracePoint Church · Waiyaki Way</p><h1>{title}</h1><p className="hero-intro">{intro}</p><div className="hero-actions"><a className="button button-dark" href="#plan-a-visit">Plan a visit <span>↗</span></a><a className="text-link" href="#missional-communities">Find your community <span>↗</span></a></div><div className="hero-note"><div className="avatar-stack" aria-hidden="true"><i>G</i><i>P</i><i>W</i></div><span>A church family, learning to follow Jesus together.</span></div></div>
         <div className="hero-art" aria-label="Warm, welcoming gathering illustration" role="img"><div className="sun"></div><div className="arch arch-back"></div><div className="arch arch-front"><div className="window"><span></span><span></span><span></span><span></span></div></div><div className="plant plant-left">✳</div><div className="plant plant-right">✳</div><div className="caption">A seat at the table<br/><small>There’s room for you.</small></div></div>
       </section>
-      <section className="quick-links" aria-label="Explore GracePoint"><a href="#plan-a-visit"><span className="quick-number">01</span><span><strong>Plan your visit</strong><small>What to expect when you join us</small></span><b aria-hidden="true">↗</b></a><a href="#missional-communities"><span className="quick-number">02</span><span><strong>Find a community</strong><small>Grow in faith, life and friendship</small></span><b aria-hidden="true">↗</b></a><a href="#about"><span className="quick-number">03</span><span><strong>Get to know us</strong><small>Our heart and what we believe</small></span><b aria-hidden="true">↗</b></a><a href="#articles"><span className="quick-number">04</span><span><strong>Read articles</strong><small>Reflections and updates</small></span><b aria-hidden="true">↗</b></a><a href="#newsletters"><span className="quick-number">05</span><span><strong>Read newsletters</strong><small>Church news and updates</small></span><b aria-hidden="true">↗</b></a></section>
+      <section className="quick-links" aria-label="Explore GracePoint"><a href="#plan-a-visit"><span className="quick-number">01</span><span><strong>Plan your visit</strong><small>What to expect when you join us</small></span><b aria-hidden="true">↗</b></a><a href="#missional-communities"><span className="quick-number">02</span><span><strong>Find a community</strong><small>Grow in faith, life and friendship</small></span><b aria-hidden="true">↗</b></a><a href="#about"><span className="quick-number">03</span><span><strong>Get to know us</strong><small>Our heart and what we believe</small></span><b aria-hidden="true">↗</b></a><a href="#articles"><span className="quick-number">04</span><span><strong>Read articles</strong><small>Reflections and updates</small></span><b aria-hidden="true">↗</b></a><a href="#newsletters"><span className="quick-number">05</span><span><strong>Read newsletters</strong><small>Church news and updates</small></span><b aria-hidden="true">↗</b></a><a href="#sermons"><span className="quick-number">06</span><span><strong>Browse sermons</strong><small>Watch messages on YouTube</small></span><b aria-hidden="true">↗</b></a></section>
       <section className="welcome section" id="about"><p className="eyebrow">Rooted in the Gospel</p><h2>Created for good works.</h2><p>We believe the good news of Jesus changes how we live, love our neighbours and serve our community. Wherever you are on your journey, you are welcome here.</p><a className="text-link" href="#serving">Discover our story <span>↗</span></a></section>
       <section className="visit section" id="plan-a-visit"><div className="visit-copy"><p className="eyebrow">Your first Sunday</p><h2>We’d love to meet you.</h2><p>GracePoint Church Waiyaki Way is a gathering of confessing Christians. Join us for our Sunday service; visitors are welcome.</p><div className="visit-details"><div><span className="detail-icon">◷</span><span><strong>Sunday service</strong><small>10:30 am – 12:30 pm</small></span></div><div><span className="detail-icon">⌖</span><span><strong>Find us</strong><small>Muthiga, off Waiyaki Way along Wambaa–Wamakima Road, between Zawadi School and Lofty Creek Christian School</small></span></div></div><a className="button button-dark" href="https://www.google.com/maps/search/?api=1&query=GracePoint+Church+Waiyaki+Way+Muthiga" target="_blank" rel="noreferrer">Get directions <span>↗</span></a></div><div className="visit-card"><div className="card-sun"></div><div className="card-lines"></div><div className="card-label">SUNDAYS TOGETHER</div><div className="card-time">10:30<span>am</span></div><div className="card-bottom">Sunday service <span>✳</span></div></div></section>
       <section className="community section" id="missional-communities"><div className="community-art"><span className="community-flower">✳</span><span className="community-word">together</span><span className="community-caption">Faith grows in community.</span></div><div className="community-copy"><p className="eyebrow">Life beyond Sunday</p><h2>Faith is better<br/>together.</h2><p>A Missional Community is a family of believers at GracePoint Waiyaki Way, intentionally following Christ and making followers of Christ in everyday life. These communities meet weekly, are centred on the Gospel, and encourage discipleship, evangelism, encouragement and prayer.</p><a className="button button-light" href="#community-list">Find a Missional Community <span>↓</span></a></div></section>
